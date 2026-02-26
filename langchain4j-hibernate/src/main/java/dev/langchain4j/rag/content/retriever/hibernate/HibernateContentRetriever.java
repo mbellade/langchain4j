@@ -15,6 +15,9 @@ import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.tool.language.internal.MetamodelJsonSerializerImpl;
 import org.hibernate.tool.language.internal.ResultsJsonSerializerImpl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,6 +54,8 @@ import static java.util.Collections.singletonList;
 @Experimental
 public class HibernateContentRetriever implements ContentRetriever {
 
+    private static final Logger log = LoggerFactory.getLogger(HibernateContentRetriever.class);
+
     private static final PromptTemplate DEFAULT_PROMPT_TEMPLATE = PromptTemplate.from(
             "You are an expert in writing Hibernate Query Language (HQL) queries.\n" +
                     "You have access to an entity model with the following structure:\n" +
@@ -62,10 +67,8 @@ public class HibernateContentRetriever implements ContentRetriever {
 
     private final SessionFactory sessionFactory;
     private final String databaseStructure;
-
     private final PromptTemplate promptTemplate;
     private final ChatModel chatModel;
-
     private final int maxRetries;
 
     /**
@@ -117,12 +120,19 @@ public class HibernateContentRetriever implements ContentRetriever {
 
             hqlQuery = clean(hqlQuery);
 
+            log.debug("Generated HQL query: {}", hqlQuery);
+
             try {
                 String result = execute(hqlQuery);
                 Content content = format(result, hqlQuery);
                 return singletonList(content);
             } catch (Exception e) {
                 errorMessage = e.getMessage();
+                if (attemptsLeft > 0) {
+                    log.warn("HQL execution failed, retrying (attempts left: {}): {}", attemptsLeft, errorMessage);
+                } else {
+                    log.warn("HQL execution failed, no retries left: {}", errorMessage);
+                }
             }
         }
 
@@ -267,6 +277,7 @@ public class HibernateContentRetriever implements ContentRetriever {
                     this.promptTemplate, this.maxRetries);
         }
 
+        @Override
         public String toString() {
             return "HibernateContentRetriever.HibernateContentRetrieverBuilder("
                     + "sessionFactory=" + this.sessionFactory

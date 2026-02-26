@@ -1,5 +1,15 @@
 package dev.langchain4j.rag.content.retriever.hibernate;
 
+import static dev.langchain4j.internal.Utils.getOrDefault;
+import static dev.langchain4j.internal.ValidationUtils.ensureNotNull;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import dev.langchain4j.Experimental;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -14,32 +24,22 @@ import org.hibernate.SessionFactory;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.tool.language.internal.MetamodelJsonSerializerImpl;
 import org.hibernate.tool.language.internal.ResultsJsonSerializerImpl;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static dev.langchain4j.internal.Utils.getOrDefault;
-import static dev.langchain4j.internal.ValidationUtils.ensureNotNull;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
-
 /**
+ * Using the {@link SessionFactory} and the {@link ChatModel}, this {@link ContentRetriever}
+ * attempts to generate and execute Hibernate queries for given natural language queries.
+ * <br>
+ * The generated HQL is guaranteed to be a SELECT statement, as Hibernate's own query parser will
+ * reject any non-SELECT HQL. Furthermore, only data contained in tables mapped by entities within
+ * the provided {@link SessionFactory} can be accessed, and existing filters/restrictions will apply.
+ * <br>
  * <b>
- * WARNING! Although fun and exciting, this class is dangerous to use! Do not ever use this in production!
- * The database user must have very limited READ-ONLY permissions!
- * Although the generated HQL is validated to be a SELECT statement using Hibernate's own query parser,
- * this class does not guarantee that the HQL will be harmless. Use it at your own risk!
+ * WARNING! All mapped data can be accessed by the content retriever. Make sure the provided {@link SessionFactory}
+ * only has access to entities that do not contain sensitive information.
  * </b>
  * <br>
- * <br>
- * Using the {@link SessionFactory} and the {@link ChatModel}, this {@link ContentRetriever}
- * attempts to generate and execute HQL queries for given natural language queries.
  * <br>
  * The entity model structure is automatically extracted from Hibernate's metamodel and provided
  * to the LLM to generate valid HQL queries.
@@ -97,14 +97,19 @@ public class HibernateContentRetriever implements ContentRetriever {
                                      Integer maxRetries) {
         this.sessionFactory = ensureNotNull(sessionFactory, "sessionFactory");
         this.chatModel = ensureNotNull(chatModel, "chatModel");
-        this.databaseStructure = getOrDefault(databaseStructure,
-                () -> MetamodelJsonSerializerImpl.INSTANCE.toString(sessionFactory.getMetamodel()));
+        this.databaseStructure = getOrDefault(databaseStructure, () -> defaultDatabaseStructure(sessionFactory));
         this.promptTemplate = getOrDefault(promptTemplate, DEFAULT_PROMPT_TEMPLATE);
         this.maxRetries = getOrDefault(maxRetries, 0);
     }
 
     public static HibernateContentRetrieverBuilder builder() {
         return new HibernateContentRetrieverBuilder();
+    }
+
+    protected static String defaultDatabaseStructure(SessionFactory sessionFactory) {
+        // By default, use Hibernate's metamodel to generate a description of the entity model structure.
+        // We use our default MetamodelJsonSerializerImpl, which produces a JSON representation of the metamodel
+        return MetamodelJsonSerializerImpl.INSTANCE.toString(sessionFactory.getMetamodel());
     }
 
     @Override
@@ -181,7 +186,7 @@ public class HibernateContentRetriever implements ContentRetriever {
                 return new ResultsJsonSerializerImpl((SessionFactoryImplementor) sessionFactory)
                         .toString(results, query);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new RuntimeException("Error during query results serialization", e);
             }
         });
     }

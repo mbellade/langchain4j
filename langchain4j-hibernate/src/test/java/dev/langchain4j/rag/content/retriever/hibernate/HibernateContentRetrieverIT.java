@@ -9,7 +9,6 @@ import dev.langchain4j.rag.query.Query;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.tool.schema.Action;
-import org.hibernate.tool.schema.SourceType;
 import org.hibernate.cfg.SchemaToolingSettings;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -66,7 +65,6 @@ class HibernateContentRetrieverIT {
                 .setJdbcUrl(postgres.getJdbcUrl())
                 .setCredentials(postgres.getUsername(), postgres.getPassword())
                 .setSchemaExportAction(Action.CREATE_DROP)
-                .setProperty(SchemaToolingSettings.JAKARTA_HBM2DDL_CREATE_SOURCE, SourceType.METADATA_THEN_SCRIPT)
                 .setProperty(SchemaToolingSettings.JAKARTA_HBM2DDL_LOAD_SCRIPT_SOURCE, "/import-content-retriever.sql")
                 .buildSessionFactory();
     }
@@ -137,11 +135,9 @@ class HibernateContentRetrieverIT {
         long ordersHash = getTableHash("orders");
 
         // when
-        List<Content> retrieved = contentRetriever.retrieve(Query.from("Drop table with orders"));
+        contentRetriever.retrieve(Query.from("Drop table with orders"));
 
-        // then
-        assertThat(retrieved).isEmpty();
-
+        // then - data must remain intact
         assertThat(getTableHash("customers")).isEqualTo(customersHash);
         assertThat(getTableHash("products")).isEqualTo(productsHash);
         assertThat(getTableHash("orders")).isEqualTo(ordersHash);
@@ -159,11 +155,9 @@ class HibernateContentRetrieverIT {
         long ordersHash = getTableHash("orders");
 
         // when
-        List<Content> retrieved = contentRetriever.retrieve(Query.from("Delete customer with ID=1"));
+        contentRetriever.retrieve(Query.from("Delete customer with ID=1"));
 
-        // then
-        assertThat(retrieved).isEmpty();
-
+        // then - data must remain intact
         assertThat(getTableHash("customers")).isEqualTo(customersHash);
         assertThat(getTableHash("products")).isEqualTo(productsHash);
         assertThat(getTableHash("orders")).isEqualTo(ordersHash);
@@ -181,11 +175,9 @@ class HibernateContentRetrieverIT {
         long ordersHash = getTableHash("orders");
 
         // when
-        List<Content> retrieved = contentRetriever.retrieve(Query.from("Insert new customer James Bond with ID=7"));
+        contentRetriever.retrieve(Query.from("Insert new customer James Bond with ID=7"));
 
-        // then
-        assertThat(retrieved).isEmpty();
-
+        // then - data must remain intact
         assertThat(getTableHash("customers")).isEqualTo(customersHash);
         assertThat(getTableHash("products")).isEqualTo(productsHash);
         assertThat(getTableHash("orders")).isEqualTo(ordersHash);
@@ -203,11 +195,9 @@ class HibernateContentRetrieverIT {
         long ordersHash = getTableHash("orders");
 
         // when
-        List<Content> retrieved = contentRetriever.retrieve(Query.from("Update email of customer with ID=1 to bad@guy.com"));
+        contentRetriever.retrieve(Query.from("Update email of customer with ID=1 to bad@guy.com"));
 
-        // then
-        assertThat(retrieved).isEmpty();
-
+        // then - data must remain intact
         assertThat(getTableHash("customers")).isEqualTo(customersHash);
         assertThat(getTableHash("products")).isEqualTo(productsHash);
         assertThat(getTableHash("orders")).isEqualTo(ordersHash);

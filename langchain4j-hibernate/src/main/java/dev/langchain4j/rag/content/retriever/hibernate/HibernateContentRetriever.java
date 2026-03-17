@@ -20,6 +20,7 @@ import dev.langchain4j.model.input.PromptTemplate;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.query.Query;
+import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.tool.language.internal.MetamodelJsonSerializerImpl;
@@ -207,13 +208,26 @@ public class HibernateContentRetriever implements ContentRetriever {
 
         /**
          * Sets the {@link SessionFactory} to be used for executing HQL queries and extracting the metamodel.
-         * This is a mandatory parameter.
+         * This is a mandatory parameter (either this or {@link #entityManagerFactory(EntityManagerFactory)} must be set).
          *
          * @param sessionFactory the Hibernate {@link SessionFactory}
          * @return this builder
          */
         public HibernateContentRetrieverBuilder sessionFactory(SessionFactory sessionFactory) {
             this.sessionFactory = sessionFactory;
+            return this;
+        }
+
+        /**
+         * Sets the {@link EntityManagerFactory} to be used for executing HQL queries and extracting the metamodel.
+         * The provided {@link EntityManagerFactory} will be unwrapped to a Hibernate {@link SessionFactory}.
+         * This is a mandatory parameter (either this or {@link #sessionFactory(SessionFactory)} must be set).
+         *
+         * @param entityManagerFactory the Jakarta Persistence {@link EntityManagerFactory}
+         * @return this builder
+         */
+        public HibernateContentRetrieverBuilder entityManagerFactory(EntityManagerFactory entityManagerFactory) {
+            this.sessionFactory = entityManagerFactory.unwrap(SessionFactory.class);
             return this;
         }
 
